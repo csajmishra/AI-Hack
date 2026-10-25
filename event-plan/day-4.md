@@ -1,162 +1,202 @@
-# Day 4: Ship It — Azure App Platform & Integration + Final Showcase
+# Day 4: Ship It Through an AI Gateway + Final Showcase
 
-> **Blueprint:** deployment assets and helper scripts are proposed, not included. This is a synthetic-data pilot, not a production-ready service. Protect `/chat` and `/process` with authentication, authorize each session and operation, and use authenticated service-to-service calls; managed identity for downstream Azure services does not secure inbound HTTP endpoints.
+**Topic:** #5 Azure App Platform and Integration Services, using **Azure API Management (APIM) AI Gateway** as the integration layer.
 
-**Topic:** #5 Azure App Platform and Integration Services
+> This documentation repository does not include application projects or deployment templates. Use the separate starter kit and tested versions shared for the event. Code and policy fragments are illustrative. Use synthetic data only.
 
-> **Modified day format:** 30 min learn · 1h45 hack · 1h45 showcase. This is needed so all 16 participants can demo. Participants should arrive with their Day 3 solution working (or switch to `day-4-start`).
+**Day format:** 30 min learning, 105 min individual build, 105 min showcase. Arrive with Day 3 working, or save your work and use `day-4-start` when available.
 
 ## Learning objectives
-By the end of the day, participants can:
-1. Choose a hosting option for AI apps (**Container Apps** vs. App Service vs. Functions) and explain why.
-2. Expose the agent team as an **HTTP API** (ASP.NET Core Minimal API) and deploy it to **Azure Container Apps** with `azd`, using a **managed identity** with no secrets.
-3. Trigger the agent from **business events** using **Azure Service Bus** + **Azure Functions** (async processing).
-4. Describe where **Logic Apps** (low-code connectors to Outlook, Teams, SAP, and so on), **API Management** (AI gateway: token limits, keys, logging), and **Event Grid** fit.
-5. Present the solution as a business case.
+
+1. Deploy your existing agent team as an ASP.NET Core HTTP API on Azure Container Apps.
+2. Publish a single governed entry point through APIM AI Gateway.
+3. Validate Microsoft Entra ID tokens, authorize sessions, and apply per-caller request limits.
+4. Proxy a model API through the same gateway and demonstrate a model-token limit.
+5. Explain the difference between governing an agent API and governing its underlying model calls.
 
 ## Agenda
 
 | Time | Block | Content |
 |---|---|---|
-| 0:00–0:10 | Concept | Hosting AI agents: Container Apps (scale to zero, revisions), App Service, Functions. Managed identity everywhere. |
-| 0:10–0:20 | Concept | Integration patterns: sync API vs. async queue, Service Bus + Functions, Logic Apps connectors, APIM as an AI gateway, Event Grid. |
-| 0:20–0:30 | Live demo + briefing | `azd deploy api`, call `/chat`, drop a message on the queue and watch the Function process it. Challenge briefing. |
-| 0:30–2:15 | **Hackathon** | M1–M3 required, M4 optional (check-in at 1:15; 5-min break around 1:20); demo prep from 2:00–2:15 |
-| 2:15–3:35 | **Showcase** | 16 × 5 min (3 min demo + 2 min Q&A) |
-| 3:35–3:45 | Judging | Judges deliberate; participants vote for People's Choice |
-| 3:45–4:00 | Awards & close | Awards, feedback survey, **`azd down --purge`** reminder |
+| 0:00-0:10 | Concept | Container Apps hosting; managed identity; AI Gateway vs. application workflow orchestration |
+| 0:10-0:20 | Concept | Gateway routes, Entra authentication, request throttling, model-token limits, safe diagnostics |
+| 0:20-0:30 | Demo and briefing | Call the agent through the gateway, reject an unauthenticated caller, and show a token-limited model request |
+| 0:30-0:50 | Build M1 | Expose your Day 3 agent team as `/chat` |
+| 0:50-1:10 | Build M2 | Deploy and test gateway-to-backend authentication |
+| 1:10-1:45 | Build M3 | Publish agent and model routes; test gateway policies |
+| 1:45-1:50 | Break | Step away from the screen |
+| 1:50-2:00 | Buffer / stretch | Troubleshooting, diagnostics, or optional improvements |
+| 2:00-2:15 | Demo preparation | Capture evidence and rehearse your 3-minute story |
+| 2:15-3:35 | Showcase | 16 demos, each 3 min plus 2 min Q&A |
+| 3:35-3:45 | Results | Score aggregation and People's Choice voting |
+| 3:45-4:00 | Close | Awards, feedback, and workshop resource cleanup |
 
 ## Real-world use cases
 
-| Use case | Integration | Business value |
+| Use case | Integration through AI Gateway | Business value |
 |---|---|---|
-| **Email-to-resolution automation** (customer service, AP invoices) | Logic Apps watches a shared mailbox → Service Bus → agent drafts a reply or creates a record → Teams approval | Turns unstructured inbound email into handled cases. Cuts response time from hours to minutes. Humans approve only exceptions. |
-| **AI gateway for the enterprise** (any org with many AI apps) | APIM in front of agent and model endpoints: auth, per-team token quotas, semantic caching, logging | Central governance, chargeback, and cost control. Teams ship AI features without each reinventing security. |
+| Customer support copilot for multiple channels | Web chat and CRM call one governed agent endpoint; each authorized caller has a request allowance | Consistent access control, traceable requests, and protection against accidental bursts |
+| HR or procurement AI platform | An employee portal calls the agent route; approved applications call a separate model route with token controls | Reusable integration, identity-based governance, and visibility into direct model consumption |
 
-## Hackathon challenge: "Production Pilot"
+## Hackathon challenge: "Governed AI Pilot"
 
 ### Problem statement
-Your agent team works on your laptop. Make it a **pilot service** that the business can use in two ways:
-1. **Synchronously** from a web chat page or another app, via `POST /chat`.
-2. **Asynchronously** from business systems: a new ticket, HR case, or purchase order arrives on a **Service Bus queue**. A **Function** sends it to the agent team, and the result is written to the `results` container in Blob Storage (or an outbound queue).
+
+Your agent team works locally. Make it accessible through **one APIM gateway** with two routes:
+
+- **Agent route:** `POST /agents/chat` forwards to the Container App's `/chat` endpoint. It returns `{ reply, agentPath, citations, requestId }`.
+- **Model route:** an imported Azure OpenAI Chat Completions API forwards to your `gpt-4.1-mini` deployment. It is used for a small, read-only summarization test with token governance.
+
+The normal business flow remains the Day 3 agent team. **No Service Bus, Function App, queue, or background-processing exercise is required.** This is synchronous API integration; a gateway is not a replacement for durable messaging.
+
+**Important boundary:** a custom `/chat` response is not a model Chat Completions response. Apply request limits to the agent route and `llm-token-limit` to the supported model route only. Foundry Agent Service's internal model calls do **not** automatically pass through APIM. The model-route test demonstrates gateway token governance, not a token cap on the hosted agents.
 
 ### Architecture
 
 ```mermaid
 flowchart LR
-    Web([Web chat page]) -->|POST /chat| ACA
-    Sys([Business system / Logic App]) -->|message| SB[(Service Bus<br/>queue: inbound)]
-    SB --> FN[Azure Function<br/>Service Bus trigger]
-    FN -->|POST /process| ACA
-    subgraph ACA[Azure Container Apps]
-        API[HackAgent.Api<br/>Minimal API] --> WF[Day 3 workflow<br/>Triage / Knowledge / Action]
-    end
+    User[Participant client / Business app] -->|Entra access token| GW[APIM AI Gateway]
+    GW -->|Agent route: request limit| API[Container App: /chat]
+    API --> WF[Day 3 agent workflow]
     WF --> FAS[Foundry Agent Service]
-    WF --> S[(AI Search)]
-    FN --> R[(Blob: results)]
-    ACA -. managed identity .-> FAS
-    ACA -. managed identity .-> S
-    APIM[API Management<br/>stretch] -.-> ACA
-    ACA -.-> AI[App Insights]
+    WF --> Search[(Azure AI Search)]
+    WF --> Tools[Mock business tools]
+    GW -->|Model route: token limit| Model[Azure OpenAI model deployment]
+    GW -. metadata diagnostics .-> Logs[Application Insights]
+    API -. correlated traces .-> Logs
 ```
 
-### Azure services & SDKs
+### Azure services and SDKs
 
 | Area | Service / package |
 |---|---|
-| Hosting | Azure Container Apps (Consumption), Azure Container Registry, `azd deploy` |
-| API | ASP.NET Core Minimal API, `Microsoft.Agents.AI.Hosting` (optional) |
-| Messaging | Azure Service Bus (Basic), `Azure.Messaging.ServiceBus` |
-| Event processing | Azure Functions (isolated worker, Flex Consumption), `Microsoft.Azure.Functions.Worker.Extensions.ServiceBus` |
-| Storage | `Azure.Storage.Blobs` |
-| Identity | User-assigned managed identity + RBAC (provisioned by Bicep) |
-| Optional | Logic Apps (Consumption), API Management (Consumption/Basic v2), Event Grid |
+| Integration | Azure API Management **Developer tier** for this non-production workshop; supports the required request and LLM-token policies |
+| Hosting | Container Apps Consumption and Azure Container Registry |
+| Application | ASP.NET Core Minimal API; Day 3 `Microsoft.Agents.AI` and `Microsoft.Agents.AI.Workflows` |
+| Authentication | Microsoft Entra ID; `Microsoft.Identity.Web` in the API; APIM `validate-azure-ad-token` and `authentication-managed-identity` |
+| Model route | Import Azure OpenAI API; APIM managed identity with `Cognitive Services OpenAI User` at the model resource |
+| Observability | APIM diagnostics and Application Insights; metadata only, without authorization headers or prompt bodies |
+| Provisioning | Starter-kit Bicep and `azd`; no APIM runtime SDK required for policy configuration |
+
+Use the pre-provisioned Developer instance for the exercise; initial provisioning may take substantially longer than the build block. Developer has no production SLA. Do not substitute Consumption without checking policy support: the required `llm-token-limit` policy is not listed for that tier.
 
 ### Milestones
 
-| # | Milestone | Done when… | Suggested time |
+| # | Build | Acceptance evidence | Time |
 |---|---|---|---|
-| M1 | **API.** In `HackAgent.Api`, register the Day 3 workflow in DI and implement `POST /chat` (`{ sessionId, message }` → `{ reply, agentPath, citations }`). Run it locally and test with `requests.http`. | A local call returns a routed, cited answer. | 30 min |
-| M2 | **Deploy.** Run `azd deploy api`, then confirm the app uses managed identity (no keys in config). Open `/` (the static chat page). | The public ACA URL answers chat requests. | 30 min |
-| M3 | **Event-driven.** Implement the Service Bus–triggered Function: deserialize the message, call `/process`, and write the JSON result to the `results` blob container. Send test messages with `scripts/send-sample.ps1`. | 3 sample messages are processed and the results are visible in Storage. | 35 min |
-| M4 *(optional)* | **Showcase polish.** Add a health endpoint, view App Insights live metrics, and prepare a 1-slide pitch. | Ready for a 3-minute demo. | 10 min+ |
+| M1 | **API.** Implement `/chat`, validate input, bind sessions to the authenticated user, and reuse the Day 3 workflow. Keep `/health` separate. | A local authenticated request returns a cited answer and agent path; missing/invalid input returns a clear 400. | 20 min |
+| M2 | **Deploy.** Run `azd deploy api`. Protect the backend with Entra authentication and authorize only the gateway application's identity for remote `/chat` calls. Preserve validated caller identity across the hop. | Gateway identity can invoke the backend; an unauthenticated direct backend call is rejected. | 20 min |
+| M3 | **Gateway.** Import the agent API and Azure OpenAI API, apply the supplied authentication/policy scaffolds, and test both routes. | Valid agent call succeeds; invalid token returns 401; unapproved caller returns 403; a burst exceeds the configured agent request rate and returns 429; an oversized model prompt exceeds its token rate and returns 429. Capture request IDs and redacted diagnostics. | 35 min |
+
+The remaining 30 minutes are a 5-minute break, 10-minute buffer, and 15-minute demo preparation. Authentication and API-import scaffolds must come from the separate starter kit; building tenant registrations from scratch is outside this short exercise.
+
+### Policy settings and test cases
+
+| Route | Setting | Test |
+|---|---|---|
+| Both | Validate expected tenant, token audience, and required scopes/roles | Missing/expired token: 401; authenticated but unauthorized caller: 403 |
+| Agent | `rate-limit-by-key`: 5 requests per 60 seconds, keyed by validated caller identity | Send a short burst; confirm 429 and `Retry-After`. Keep prompts small; stop on throttling |
+| Model | `llm-token-limit`: 1,000 tokens/minute with prompt estimation, keyed by validated caller identity | In a fresh window send a synthetic prompt clearly above 1,000 tokens, allowing for the pinned model tokenizer; confirm 429 |
+| Agent backend | Gateway managed identity plus trusted original caller context | A direct unauthorized request fails; a spoofed caller header is overwritten or rejected |
+| Diagnostics | Request ID, route, status, latency; no prompt content or secrets | Correlate a successful call and a rejected call without exposing tokens |
+
+Illustrative fragments belong in **different API policies**, after token validation and role/scope checks. The authentication scaffold sets `callerId` from validated `tid` + `oid` claims, never from a user-supplied header. APIM rate limits are distributed controls, not precise financial caps.
+
+```xml
+<!-- Agent API inbound fragment -->
+<rate-limit-by-key calls="5" renewal-period="60"
+    counter-key='@("agent:" + (string)context.Variables["callerId"])' />
+```
+
+```xml
+<!-- Model API inbound fragment; not the custom agent API -->
+<llm-token-limit
+    counter-key='@("model:" + (string)context.Variables["callerId"])'
+    tokens-per-minute="1000"
+    estimate-prompt-tokens="true" />
+```
+
+Gateway-to-backend identity is distinct from the original user. The supplied backend authentication scaffold must validate the gateway token and trust caller context only on that authenticated hop. Never authorize a session based solely on a `sessionId` or an unvalidated identity header.
 
 ### Stretch goals
-- **Logic App:** an Outlook/Gmail "new email" trigger → send to Service Bus (no code).
-- **API Management AI gateway:** import the ACA API, then add `rate-limit-by-key` and a subscription key requirement.
-- **Teams notification** of escalated cases via a Logic App connector.
-- **Dead-letter handling:** a poison message goes to the DLQ and an alert is raised.
-- **Session state:** persist threads by `sessionId` (in-memory → Cosmos DB / Redis) so chats survive restarts.
 
-## Starter code outline
+- Configure a daily model-token quota and explain its 403 response versus the rate limit's 429.
+- Add a second approved model backend and a circuit breaker. Do not blindly retry write actions.
+- Add a dashboard of route latency, rejected calls, and direct-model token usage.
+- Let a Logic App call the authenticated gateway agent route; keep connectors optional.
+- Explore semantic caching for read-only, non-personalized model requests only. Do not cache actions or cross-user HR/customer responses.
+
+## Starter-code outline
+
+These are the expected assets in the separate starter kit, not files in this documentation repository.
 
 ```text
 src/HackAgent.Api/
-├─ Program.cs                   # TODO: DI for workflow + /chat, /process, /health endpoints
-├─ Contracts/ChatRequest.cs     # provided
-├─ wwwroot/index.html           # simple chat page (provided)
-├─ requests.http                # local test calls
-└─ Dockerfile                   # provided (multi-stage, non-root)
-src/HackAgent.Functions/
-├─ ProcessInbound.cs            # TODO: ServiceBusTrigger → HTTP call → blob output
-└─ host.json / local.settings.json.example
-scripts/send-sample.ps1         # sends 3 scenario messages to the queue
-azure.yaml                      # services: api (containerapp), func (function)
+  Program.cs                    # authenticated /chat and /health
+  Contracts/ChatRequest.cs       # sessionId, message
+  Contracts/ChatResponse.cs      # reply, agentPath, citations, requestId
+  Security/CallerContext.cs     # validates gateway identity and trusted user context
+  Dockerfile                    # multi-stage, non-root
+gateway/
+  agent-api.openapi.json        # gateway /agents/chat -> backend /chat
+  policies/agent-inbound.xml    # token validation, roles, request limit, backend identity
+  policies/model-inbound.xml    # token validation, roles, token limit, model identity
+scripts/
+  test-gateway.ps1              # auth failures, happy path, request/token throttling
+  summarize-sample.ps1          # synthetic read-only model-route example
+infra/
+  gateway.bicep                 # APIM Developer, identities, diagnostics
+  auth.bicep                    # associated authentication configuration
+azure.yaml                      # service: api (containerapp)
 ```
 
-Key code shape (illustrative):
+Tenant application registrations, consent, and API app roles are prerequisites configured by the starter kit's documented authentication setup, not assumed to appear automatically from Azure RBAC assignments.
 
-```csharp
-// HackAgent.Api/Program.cs
-builder.Services.AddSingleton(sp => AgentTeam.CreateAsync(settings, new DefaultAzureCredential()).GetAwaiter().GetResult());
-app.MapPost("/chat", async (ChatRequest req, AgentTeam team, CancellationToken ct) =>
-    Results.Ok(await team.RunAsync(req.SessionId, req.Message, ct)));
-app.MapGet("/health", () => Results.Ok("healthy"));
+## Rubric (score each 1-5)
 
-// HackAgent.Functions/ProcessInbound.cs
-[Function(nameof(ProcessInbound))]
-[BlobOutput("results/{MessageId}.json", Connection = "Storage")]
-public async Task<string> Run(
-    [ServiceBusTrigger("inbound", Connection = "ServiceBus")] ServiceBusReceivedMessage msg)
-{
-    var response = await _http.PostAsJsonAsync("/process", msg.Body.ToObjectFromJson<InboundCase>());
-    response.EnsureSuccessStatusCode();
-    return await response.Content.ReadAsStringAsync();
-}
-```
+Use this as a readiness check, not an additional daily progress bonus. See the [showcase scoring](README.md#assessment-and-showcase).
 
-## Rubric (Day 4 milestones; score each 1–5)
-
-Use this rubric to check your Day 4 readiness. It is not an additional daily progress bonus. The **showcase rubric** that decides the awards is in the [participant guide](./README.md#assessment-and-showcase).
-
-| Criterion | 1 – Beginning | 3 – Solid | 5 – Excellent |
+| Criterion | 1 - Beginning | 3 - Solid | 5 - Excellent |
 |---|---|---|---|
-| Functionality | Runs locally only | Deployed API works + queue messages processed | Plus resilient handling (retries, DLQ, health checks) |
-| Use of the day's tech | Keys in config; manual deploy | `azd` deploy, managed identity, Service Bus + Function | Plus APIM / Logic Apps / observability used meaningfully |
-| Creativity | Generic integration | Scenario-realistic event and output | Inventive integration (Teams approval, email flow, dashboard) |
-| Demo quality | Disorganized; over time | Clear 3-minute story covering all four layers | Compelling business pitch, architecture explained, confident Q&A |
+| Functionality | Local API only | Agent works through gateway with citations | Both routes pass success, authentication, authorization, and throttle tests |
+| Use of the day's technology | Gateway is bypassed | APIM is the required entry point; request and model-token policies work | Plus backend identity enforcement and correlated, redacted diagnostics |
+| Creativity | Unchanged sample | Scenario-specific client or summarization request | Useful governed integration or safe resilience improvement |
+| Demo quality | Output without context | Clear business flow and one rejected request | Explains both routes and honestly distinguishes agent requests from model-token accounting |
 
-### Showcase demo checklist (for participants)
-1. **Problem and persona** (20 s): who is the user and what is the pain?
-2. **Live chat** (60 s): a policy question with a citation, then an action with a handoff.
-3. **Event flow** (40 s): send a queue message and show the result in Storage.
-4. **Architecture** (30 s): one diagram covering the agent team, RAG, and hosting.
-5. **Next step** (10 s): what would make this production-ready?
-6. **Backup:** have a 3-minute screen recording ready in case the live demo fails.
+## Showcase demo checklist
+
+1. **Problem and user (20 s).**
+2. **Agent through gateway (60 s):** grounded answer, citation, specialist handoff, and approved mock action.
+3. **Gateway controls (40 s):** show a rejected request and token-limit evidence from the direct model route.
+4. **Architecture (30 s):** explain the two gateway routes and hosted-agent boundary.
+5. **Next improvement (10 s).** Keep a backup recording and sanitized evidence ready.
 
 ## Prerequisites
-- Day 3 M3 complete, or `git switch day-4-start`
-- ACA environment, ACR, Service Bus, and Function App provisioned (run `azd provision` again if setup skipped them)
-- Docker is **not** required; `azd` builds remotely in ACR
+
+- Day 3 M3 complete, or a published `day-4-start` checkpoint.
+- Container Apps, ACR, APIM Developer, identities, model access, and diagnostics already provisioned.
+- The event's Entra app registrations, roles/scopes, consent, and test access-token instructions.
+- A working gateway URL and a passed [Day 4 readiness check](setup.md#day-4-gateway-readiness).
+- No local Docker requirement when using the starter kit's remote ACR build.
 
 ## Common pitfalls
 
-| Pitfall | Fix |
+| Symptom | Action |
 |---|---|
-| Works locally, 403 in Azure | Your *user* had the roles; the app's **managed identity** needs *Azure AI User*, *Search Index Data Reader*, and the Service Bus/Storage roles. Bicep assigns these, but check `AZURE_CLIENT_ID` is set for the user-assigned identity. |
-| Container starts then crashes | Missing environment variables in the Container App. Compare with `.env`, then run `azd env get-values` and `az containerapp logs show`. |
-| First request is slow (cold start) | Scale to zero is expected. Set `minReplicas: 1` during the showcase only, then set it back. |
-| Function never fires | Check that the queue name and the `ServiceBus__fullyQualifiedNamespace` setting match (identity-based connection) and that the function app identity has *Azure Service Bus Data Receiver*. |
-| Messages retried endlessly | Exceptions cause redelivery. After max delivery count, a message goes to the DLQ, so make the processing idempotent. |
-| `azd deploy` fails building the image | Check the Dockerfile path in `azure.yaml`; check the .NET SDK image tag matches `TargetFramework`. |
-| Forgot to clean up | Confirm your workshop environment, run `azd down --purge` at the end of the day, and verify that no workshop resources remain billable. |
+| APIM is still deploying | Complete provisioning before the session; do not spend the build block waiting for a new instance |
+| Gateway 401/403 | Check tenant, audience, expiry, scopes/roles, and backend managed identity separately |
+| Token policy fails on `/chat` | It expects a supported model schema; use request throttling for the agent route |
+| Agent tokens are absent from model-route usage | Hosted Agent Service inference is not on that route; do not claim full agent cost enforcement |
+| 429 from the backend rather than the gateway | Correlate diagnostics; model quota and APIM policy limits are separate controls |
+| Backend bypass works or caller identity can be spoofed | Enforce gateway identity at the API, overwrite incoming caller headers, and validate session ownership |
+| Policy rejects the configured tier | Use the tested Developer tier and check the current policy support matrix |
+| Container cold start delays demo | Warm it before presenting, or temporarily use one minimum replica; restore scale-to-zero afterward |
+| Gateway/model resource keeps charging | Verify teardown of the APIM instance and all workshop resources, not just the Container App |
+
+## References
+
+- [Azure API Management AI Gateway](https://learn.microsoft.com/en-us/azure/api-management/genai-gateway-capabilities)
+- [LLM token limits and supported model schemas](https://learn.microsoft.com/en-us/azure/api-management/llm-token-limit-policy)
+- [Per-key request limits](https://learn.microsoft.com/en-us/azure/api-management/rate-limit-by-key-policy)
+- [Validate Entra tokens](https://learn.microsoft.com/en-us/azure/api-management/validate-azure-ad-token-policy)
+- [Managed identity authentication](https://learn.microsoft.com/en-us/azure/api-management/authentication-managed-identity-policy)
