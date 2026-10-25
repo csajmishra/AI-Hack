@@ -23,7 +23,7 @@ By the end of the day, participants can:
 | 0:55–1:00 | Briefing | Challenge and milestones |
 | 1:00–3:30 | **Hackathon** | M1–M4 + stretch goals (check-ins at 1:45 and 2:30; break around 2:10) |
 | 3:30–3:50 | Demos | 3 volunteers × 5 min (show a routing trace) |
-| 3:50–4:00 | Wrap | Recap, preview of Day 4; ask participants to prepare a 1-slide pitch for the showcase |
+| 3:50–4:00 | Wrap | Recap, preview of Day 4; prepare a 1-slide pitch for your showcase |
 
 ## Real-world use cases
 

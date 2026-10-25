@@ -127,7 +127,7 @@ public async Task<string> Run(
 
 ## Rubric (Day 4 milestones; score each 1–5)
 
-These scores feed the "Use of the event's tech" criterion in the showcase. The **showcase rubric** that decides the awards is in [README.md](./README.md#final-showcase-format-and-scoring-day-4).
+Use this rubric to check your Day 4 readiness. It is not an additional daily progress bonus. The **showcase rubric** that decides the awards is in the [participant guide](./README.md#assessment-and-showcase).
 
 | Criterion | 1 – Beginning | 3 – Solid | 5 – Excellent |
 |---|---|---|---|
