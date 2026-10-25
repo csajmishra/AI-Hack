@@ -1,6 +1,6 @@
 # Pre-Event Setup Guide
 
-> **Facilitator preparation blueprint.** The starter repository, Bicep templates, smoke-test command, and development container described below are planned assets, not included in this public documentation repository. Replace the placeholder clone URL with a rehearsed starter-kit URL before sending participant instructions. Do not run these commands against this documentation repository.
+> **Before running commands:** this repository contains participant documentation only. Use the separate starter-kit URL shared in the event announcement. Its application projects, provisioning templates, smoke test, and development container must be available before you can run the commands below.
 
 Finish everything here **before Day 1**. The **setup clinic is at T-3 days**, and anyone whose smoke test fails must attend. Plan for 45–60 minutes.
 
@@ -95,7 +95,7 @@ Expected output:
 All checks passed.
 ```
 
-Post a screenshot of the passing output in the event chat channel `#setup`. A facilitator will tick you off.
+Post a screenshot of the passing output in the event chat channel `#setup`. Redact account details and sensitive configuration.
 
 ## 4. Troubleshooting
 
@@ -114,14 +114,3 @@ azd down --purge --force
 ```
 
 `--purge` requests permanent removal of supported soft-deleted resources and can be irreversible. Preview the target environment and confirm it contains only workshop resources before teardown. Verify in the portal that all workshop resource groups and billable resources are gone; do not assume quota has been released without checking.
-
-## Facilitator pre-event checklist
-
-| When | Task |
-|---|---|
-| T-14 d | Send the invitation with this guide and subscription details. Confirm that each participant has a subscription. |
-| T-7 d | Do a full dry run in a clean subscription. Pin NuGet versions. Tag the `day-N-start` branches. |
-| T-5 d | Check quota for every subscription (`az cognitiveservices usage list -l <region>`). |
-| T-3 d | Hold the setup clinic and collect smoke-test screenshots. |
-| T-1 d | Chase anyone missing. Prepare a **spare subscription** with 2 pre-provisioned environments as a fallback. |
-| Day 4 end | Remind everyone to tear down. Check for leftover resource groups at T+2 d. |

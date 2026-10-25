@@ -1,6 +1,6 @@
 # Day 1: Your First End-to-End Agent
 
-> **Blueprint:** starter files and checkpoints are proposed facilitator assets. Snippets are illustrative and must be adapted to pinned, tested SDK versions. Use synthetic data and require explicit approval before any write tool.
+> Use the separate starter kit and tested SDK versions shared for this event. Files and checkpoints shown here are not included in this documentation repository. Snippets are illustrative. Use synthetic data and require explicit approval before any write tool.
 
 **Topics:** #1 Building end-to-end AI agents + #4 Azure AI Agent Service (Foundry Agent Service)
 
@@ -23,7 +23,7 @@ By the end of the day, participants can:
 | 0:55–1:00 | Briefing | Challenge walk-through and milestones |
 | 1:00–3:30 | **Hackathon** | M1–M4 + stretch goals (traffic-light check-ins at 1:45 and 2:30; 10-min break around 2:10) |
 | 3:30–3:50 | Demos | 3 volunteers × 5 min |
-| 3:50–4:00 | Wrap | Recap, preview of Day 2, push `day-2-start` |
+| 3:50–4:00 | Wrap | Recap, preview of Day 2, save and commit your progress |
 
 ## Real-world use cases
 

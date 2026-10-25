@@ -1,6 +1,6 @@
 # Day 3: Multi-Agent Orchestration
 
-> **Blueprint:** starter files and checkpoints are proposed facilitator assets; workflow APIs must be checked against pinned SDK versions. Enforce a bounded hop count, timeout, and approval before write tools in application code, not only in prompts.
+> Use the separate starter kit shared for this event; the files and checkpoints below are not included in this documentation repository. Use its pinned SDK versions. Enforce a bounded hop count, timeout, and approval before write tools in application code, not only in prompts.
 
 **Topic:** #2 Multi-agent orchestration
 

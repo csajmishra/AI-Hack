@@ -1,6 +1,6 @@
 # Day 2: Grounding the Agent with Advanced RAG
 
-> **Blueprint:** starter files and datasets are proposed facilitator assets; SDK snippets are illustrative. Treat retrieved documents as untrusted input, enforce authorization outside the model, and never allow model-selected filters to grant access.
+> Use the separate starter kit shared for this event; the files and datasets below are not included in this documentation repository. SDK snippets are illustrative. Treat retrieved documents as untrusted input, enforce authorization outside the model, and never allow model-selected filters to grant access.
 
 **Topic:** #3 Advanced RAG patterns
 

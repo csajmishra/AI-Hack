@@ -159,4 +159,4 @@ These scores feed the "Use of the event's tech" criterion in the showcase. The *
 | Function never fires | Check that the queue name and the `ServiceBus__fullyQualifiedNamespace` setting match (identity-based connection) and that the function app identity has *Azure Service Bus Data Receiver*. |
 | Messages retried endlessly | Exceptions cause redelivery. After max delivery count, a message goes to the DLQ, so make the processing idempotent. |
 | `azd deploy` fails building the image | Check the Dockerfile path in `azure.yaml`; check the .NET SDK image tag matches `TargetFramework`. |
-| Forgot to clean up | Run `azd down --purge` at the end of the day. Facilitators verify at T+2 days. |
+| Forgot to clean up | Confirm your workshop environment, run `azd down --purge` at the end of the day, and verify that no workshop resources remain billable. |
